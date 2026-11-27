@@ -117,8 +117,12 @@ jobs:
               errors += int(suite.get("errors", 0))
               skipped += int(suite.get("skipped", 0))
 
-          print(f"unit tests: {total} run, {failures} failed, {errors} errored, {skipped} skipped")
+          summary = f"unit tests: {total} run, {failures} failed, {errors} errored, {skipped} skipped"
+          print(summary)
+          # Surfaced as a check-run annotation so results are visible without opening logs.
+          print(f"::notice::{summary}")
           if total == 0 or failures or errors:
+              print("::error::unit test verification failed")
               sys.exit("unit test verification failed")
           PY
 
