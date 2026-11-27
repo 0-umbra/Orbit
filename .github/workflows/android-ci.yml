@@ -27,32 +27,73 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle with caching
         uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
+        run: ./gradlew --no-daemon --console=plain testDebugUnitTest
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon --console=plain assembleDebug
 
-      - name: Verify APK output
+      - name: Verify APK output path
         run: |
-          test -f app/build/outputs/apk/debug/app-debug.apk
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
           ls -lh app/build/outputs/apk/debug/
+
+      - name: Verify application id, SDK levels and permissions
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          AAPT2=$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name aapt2 | sort -V | tail -1)
+          echo "Using $AAPT2"
+          "$AAPT2" dump badging "$APK" > apk-badging.txt
+          grep -E '^(package|sdkVersion|targetSdkVersion):' apk-badging.txt
+          grep -q "package: name='com.orbit.commandcenter'" apk-badging.txt \
+            || { echo "::error::unexpected application id"; exit 1; }
+          grep -q "sdkVersion:'26'" apk-badging.txt \
+            || { echo "::error::unexpected minSdk"; exit 1; }
+          grep -q "targetSdkVersion:'35'" apk-badging.txt \
+            || { echo "::error::unexpected targetSdk"; exit 1; }
+          PERMISSIONS=$("$AAPT2" dump permissions "$APK" || true)
+          echo "$PERMISSIONS"
+          if echo "$PERMISSIONS" | grep -q "uses-permission"; then
+            echo "::error::Phase 0 must not request any permission"
+            exit 1
+          fi
+
+      - name: Summarize unit test results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+
+          total = failures = errors = skipped = 0
+          for path in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
+              suite = ET.parse(path).getroot()
+              print(f"  {suite.get('name')}: {suite.get('tests')} tests")
+              total += int(suite.get("tests", 0))
+              failures += int(suite.get("failures", 0))
+              errors += int(suite.get("errors", 0))
+              skipped += int(suite.get("skipped", 0))
+
+          print(f"unit tests: {total} run, {failures} failed, {errors} errored, {skipped} skipped")
+          if total == 0 or failures or errors:
+              sys.exit("unit test verification failed")
+          PY
 
       - name: Upload unit test report
         if: always()
