@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light theme foundation. Jetpack Compose draws the real UI; this platform
+         theme only provides the pre-Compose window background and system bar setup. -->
+    <style name="Theme.Orbit" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/orbit_window_background_light</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

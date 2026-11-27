@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window backgrounds used before Jetpack Compose draws its first frame.
+         They mirror the ORBIT palette so the launch transition has no flash. -->
+    <color name="orbit_window_background_light">#FAFAFC</color>
+    <color name="orbit_window_background_dark">#111318</color>
+
+    <!-- Adaptive launcher icon background. -->
+    <color name="orbit_ic_background">#111318</color>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ORBIT</string>
+    <string name="app_tagline">Personal command center</string>
+
+    <string name="dashboard_welcome_title">Welcome to ORBIT</string>
+    <string name="dashboard_welcome_body">A calm, offline-first home for your tasks, projects, notes, goals and focus sessions. This is the foundation screen for Phase 0 — the structure is in place, the modules arrive next.</string>
+    <string name="dashboard_foundation_chip">Phase 0 · Foundation</string>
+    <string name="dashboard_roadmap_title">Coming soon</string>
+    <string name="dashboard_roadmap_caption">Planned modules. None of them are functional yet.</string>
+    <string name="dashboard_about_action">About ORBIT</string>
+    <string name="dashboard_privacy_note">Offline-first. No account, no tracking, no network permission.</string>
+
+    <string name="module_status_planned">Planned</string>
+    <string name="module_status_in_progress">In progress</string>
+    <string name="module_status_available">Available</string>
+
+    <string name="about_title">About ORBIT</string>
+    <string name="about_back">Back</string>
+    <string name="about_body">ORBIT is a personal command center for Android. It is designed to be private by default: your data stays on your device, and nothing is sent anywhere unless you explicitly ask for it.</string>
+    <string name="about_offline_title">Offline-first</string>
+    <string name="about_offline_body">Every core feature is built to work with no network connection. The Phase 0 build does not request any permission at all.</string>
+    <string name="about_stack_title">Built with</string>
+    <string name="about_stack_body">Kotlin, Jetpack Compose, Material 3 and an MVVM architecture, on a Gradle Kotlin DSL build with JDK 17.</string>
+    <string name="about_version_note">Version %1$s · Phase 0 foundation</string>
+    <string name="about_version_value">0.1.0</string>
+</resources>
