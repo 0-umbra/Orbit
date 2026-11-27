@@ -59,10 +59,12 @@ jobs:
           AAPT2=$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name aapt2 | sort -V | tail -1)
           echo "Using $AAPT2"
           "$AAPT2" dump badging "$APK" > apk-badging.txt
-          grep -E '^(package|sdkVersion|targetSdkVersion):' apk-badging.txt
+          # Print the identity lines so the log is self-explanatory.
+          grep -E "^(package|minSdkVersion|sdkVersion|targetSdkVersion):" apk-badging.txt || true
           grep -q "package: name='com.orbit.commandcenter'" apk-badging.txt \
             || { echo "::error::unexpected application id"; exit 1; }
-          grep -q "sdkVersion:'26'" apk-badging.txt \
+          # aapt/aapt2 builds differ in how they label the minimum SDK line.
+          grep -Eq "(minSdkVersion|sdkVersion):'26'" apk-badging.txt \
             || { echo "::error::unexpected minSdk"; exit 1; }
           grep -q "targetSdkVersion:'35'" apk-badging.txt \
             || { echo "::error::unexpected targetSdk"; exit 1; }
