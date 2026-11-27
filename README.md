@@ -4,8 +4,8 @@ A premium, offline-first personal command center for Android.
 
 ORBIT brings tasks, projects, notes, goals, habits, a focus timer, reminders and
 productivity insights into one calm application. It is designed to be private by
-default: everything stays on the device, and the Phase 0 build does not request a
-single permission.
+default: everything stays on the device, and the Phase 0 build requests no Android
+system permission at all.
 
 > **Status: Phase 0 — Engineering foundation.**
 > This repository currently ships the native Android foundation (build setup, theme,
@@ -101,7 +101,11 @@ targeting `develop`.
 
 - `minSdk` 26 (Android 8.0) — covers ordinary and low-cost devices.
 - Primary test device for this project: Motorola Moto E13, Android 13, 8 GB RAM.
-- No permissions, no background services and no network dependency in Phase 0.
+- No Android system permissions, no background services and no network dependency in
+  Phase 0. The merged manifest contains one app-private signature permission
+  (`com.orbit.commandcenter.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`) that
+  `androidx.core` generates automatically to guard dynamically registered receivers; it is
+  not requested from the user and CI asserts that nothing else is declared.
 
 Testing on physical hardware has **not** been performed as part of this phase; see
 `docs/DEVELOPMENT.md` for the manual verification checklist.

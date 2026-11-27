@@ -4,6 +4,10 @@
     <!--
         ORBIT deliberately requests no permissions in Phase 0: the foundation is
         fully offline and needs no network, location, storage or notification access.
+        The merged manifest will still contain the app-private signature permission that
+        androidx.core generates for dynamically registered receivers
+        (DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION); CI asserts no system permission is
+        ever added.
     -->
 
     <application

@@ -151,7 +151,11 @@ across short configuration changes and stops work when the screen goes away.
   `onSurface` / `onSurfaceVariant`.
 - Touch targets follow Material defaults (buttons, chips, cards).
 - `supportsRtl="true"` with start/end padding throughout.
-- No permissions, no services, no `allowBackup` (personal data must not leave the device).
+- No system permissions, no services, no `allowBackup` (personal data must not leave the
+  device). The processed manifest still contains one app-private signature permission,
+  `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, injected by `androidx.core` for its
+  dynamically registered receivers. It is never granted to the user and CI fails if any
+  `android.permission.*` entry ever appears.
 
 ## Testing strategy
 
