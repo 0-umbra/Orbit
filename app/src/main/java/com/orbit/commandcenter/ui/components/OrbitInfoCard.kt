@@ -1,6 +1,5 @@
 package com.orbit.commandcenter.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +16,8 @@ import androidx.compose.ui.unit.dp
  * Charcoal surface card used across the foundation screens.
  *
  * A single shared surface keeps spacing, corner radius and borders consistent, so feature
- * screens added later inherit the ORBIT look for free.
+ * screens added later inherit the ORBIT look for free. Elevation is pinned to 0dp: ORBIT
+ * uses flat surfaces, so no shadow or tonal overlay work is scheduled while scrolling.
  */
 @Composable
 fun OrbitInfoCard(
@@ -29,7 +29,9 @@ fun OrbitInfoCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = rememberOrbitCardBorder(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
             Text(

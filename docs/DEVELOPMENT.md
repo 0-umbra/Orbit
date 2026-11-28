@@ -87,6 +87,43 @@ the processed manifest that no Android system permission is requested. It then s
 the JUnit XML results and uploads two artifacts: `unit-test-report` and `orbit-debug-apk`
 (14-day retention). Workflow permissions are `contents: read`; no secrets are used.
 
+## 5a. Performance verification
+
+Static tooling (runs everywhere, no device needed):
+
+```bash
+./gradlew assembleDebug
+ls app/build/compose_reports/     # app_debug-classes.txt, app_debug-composables.txt
+```
+
+- `*-classes.txt` lists the inferred stability of every class. `stable class
+  DashboardUiState` and `stable class OrbitModule` are required — an unstable dashboard
+  state means the whole screen recomposes instead of skipping.
+- `*-composables.txt` lists each composable with `restartable`/`skippable` markers.
+  `restartable skippable fun OrbitModuleCard(...)` is what keeps scroll frames free of work.
+- CI runs these assertions on every pull request and uploads the reports as the
+  `compose-compiler-reports` artifact.
+- `./gradlew testDebugUnitTest` guards the data-level invariants that make skipping
+  possible (stable list instances, single emission).
+
+On-device tooling (developer machine, needs a connected device):
+
+```bash
+# Frame timing for the package
+adb shell dumpsys gfxinfo com.orbit.commandcenter framestats
+adb shell dumpsys gfxinfo com.orbit.commandcenter reset
+```
+
+- Use Android Studio's Profiler (System trace / Layout Inspector recomposition counts) for
+  the detailed picture.
+- **Debug builds are not representative.** They run without R8/minification and with JIT
+  warm-up, so they scroll measurably slower than a release build on low-end hardware. For
+  honest numbers build a release variant signed with your own key
+  (`assembleRelease` once a signing config exists) or use `androidx.benchmark`
+  Macrobenchmark, which is the planned tool for a later phase.
+- Phase 0.1 was validated with the compiler reports, unit tests and the CI build only —
+  no on-device frame profiling was performed as part of it.
+
 ## 6. Git branching policy
 
 | Branch | Purpose | Rules |

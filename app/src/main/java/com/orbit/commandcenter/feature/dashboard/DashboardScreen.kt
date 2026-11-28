@@ -1,6 +1,5 @@
 package com.orbit.commandcenter.feature.dashboard
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,6 +17,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,11 +33,30 @@ import com.orbit.commandcenter.domain.model.OrbitModule
 import com.orbit.commandcenter.domain.model.OrbitRoadmap
 import com.orbit.commandcenter.ui.components.OrbitBrandHeader
 import com.orbit.commandcenter.ui.components.StatusPill
+import com.orbit.commandcenter.ui.components.rememberOrbitCardBorder
 import com.orbit.commandcenter.ui.theme.OrbitTheme
+
+// Static layout values are hoisted to the file scope: they never change while the app
+// runs, so they are allocated once instead of on every composition of the list.
+private val DashboardContentPadding =
+    PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 36.dp)
+private val DashboardItemSpacing: Arrangement.Vertical = Arrangement.spacedBy(14.dp)
+private val AboutButtonPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)
+private val PrivacyNotePadding = Modifier.padding(top = 12.dp)
+private val RoadmapHeaderPadding = Modifier.padding(top = 12.dp)
+private val WelcomeCardPadding = Modifier.padding(horizontal = 22.dp, vertical = 20.dp)
+private val ModuleCardPadding = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)
+
+/** Lets the lazy list reuse slot content for the (uniform) module cards. */
+private const val ModuleContentType = "orbit-module"
 
 /**
  * ORBIT launch screen: branding, a short welcome message and the module roadmap that
  * doubles as the dashboard placeholder for Phase 0.
+ *
+ * The screen is a single [LazyColumn] with stable keys and content types, so scrolling
+ * only composes the rows that become visible and never recomposes the ones that stay on
+ * screen.
  */
 @Composable
 fun DashboardScreen(
@@ -68,38 +87,37 @@ private fun DashboardContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                top = 28.dp,
-                bottom = 36.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = DashboardContentPadding,
+            verticalArrangement = DashboardItemSpacing,
         ) {
-            item(key = "brand") {
+            item(key = "brand", contentType = "brand") {
                 OrbitBrandHeader()
             }
-            item(key = "welcome") {
+            item(key = "welcome", contentType = "welcome") {
                 WelcomeCard()
             }
-            item(key = "roadmap-header") {
+            item(key = "roadmap-header", contentType = "section-header") {
                 RoadmapHeader()
             }
-            items(items = uiState.modules, key = { module -> module.id }) { module ->
+            items(
+                items = uiState.modules,
+                key = { module -> module.id },
+                contentType = { ModuleContentType },
+            ) { module ->
                 OrbitModuleCard(module = module)
             }
-            item(key = "privacy") {
+            item(key = "privacy", contentType = "note") {
                 Text(
                     text = stringResource(R.string.dashboard_privacy_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = PrivacyNotePadding,
                 )
             }
-            item(key = "about") {
+            item(key = "about", contentType = "action") {
                 TextButton(
                     onClick = onNavigateToAbout,
-                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
+                    contentPadding = AboutButtonPadding,
                 ) {
                     Text(
                         text = stringResource(R.string.dashboard_about_action),
@@ -118,9 +136,11 @@ private fun WelcomeCard() {
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = rememberOrbitCardBorder(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
+        Column(modifier = WelcomeCardPadding) {
             StatusPill(text = stringResource(R.string.dashboard_foundation_chip))
             Spacer(modifier = Modifier.height(14.dp))
             Text(
@@ -140,7 +160,7 @@ private fun WelcomeCard() {
 
 @Composable
 private fun RoadmapHeader() {
-    Column(modifier = Modifier.padding(top = 12.dp)) {
+    Column(modifier = RoadmapHeaderPadding) {
         Text(
             text = stringResource(R.string.dashboard_roadmap_title),
             style = MaterialTheme.typography.titleLarge,
@@ -161,9 +181,11 @@ private fun OrbitModuleCard(module: OrbitModule) {
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = rememberOrbitCardBorder(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+        Column(modifier = ModuleCardPadding) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -190,6 +212,7 @@ private fun OrbitModuleCard(module: OrbitModule) {
 }
 
 @Composable
+@ReadOnlyComposable
 private fun statusLabel(status: ModuleStatus): String = when (status) {
     ModuleStatus.PLANNED -> stringResource(R.string.module_status_planned)
     ModuleStatus.IN_PROGRESS -> stringResource(R.string.module_status_in_progress)
@@ -197,6 +220,7 @@ private fun statusLabel(status: ModuleStatus): String = when (status) {
 }
 
 @Composable
+@ReadOnlyComposable
 private fun statusAccent(status: ModuleStatus): Color = when (status) {
     ModuleStatus.PLANNED -> MaterialTheme.colorScheme.onSurfaceVariant
     ModuleStatus.IN_PROGRESS -> MaterialTheme.colorScheme.secondary

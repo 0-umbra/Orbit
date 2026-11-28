@@ -47,6 +47,49 @@ jobs:
       - name: Build debug APK
         run: ./gradlew --no-daemon --console=plain assembleDebug
 
+      - name: Verify Compose stability report
+        run: |
+          CLASSES=$(ls app/build/compose_reports/*-classes.txt 2>/dev/null | head -1)
+          COMPOSABLES=$(ls app/build/compose_reports/*-composables.txt 2>/dev/null | head -1)
+          if [ -z "$CLASSES" ] || [ -z "$COMPOSABLES" ]; then
+            echo "::error::Compose compiler reports were not generated in app/build/compose_reports"
+            exit 1
+          fi
+          echo "class stability report: $CLASSES"
+          grep -E "class (DashboardUiState|OrbitModule|ModuleStatus)" "$CLASSES" || true
+          echo "composable report: $COMPOSABLES"
+          grep -E "fun (DashboardContent|WelcomeCard|OrbitModuleCard|StatusPill|OrbitBrandHeader|OrbitInfoCard|OrbitMark)\(" "$COMPOSABLES" || true
+          failed=0
+          for type in DashboardUiState OrbitModule; do
+            if grep -qE "^stable class ${type}( |\{|$)" "$CLASSES"; then
+              echo "::notice::${type} is stable"
+            else
+              echo "::error::${type} is not stable: $(grep -E "class ${type}" "$CLASSES" | head -1)"
+              failed=1
+            fi
+          done
+          for fn in DashboardContent WelcomeCard OrbitModuleCard StatusPill OrbitBrandHeader OrbitInfoCard OrbitMark; do
+            line=$(grep -E "fun ${fn}\(" "$COMPOSABLES" | head -1)
+            if echo "$line" | grep -q "skippable"; then
+              echo "::notice::${fn} is skippable"
+            else
+              echo "::error::${fn} is not skippable: ${line:-not found}"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+
+      - name: Upload Compose compiler reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-compiler-reports
+          path: |
+            app/build/compose_reports
+            app/build/compose_metrics
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Verify APK output path
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk

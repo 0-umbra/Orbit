@@ -7,6 +7,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -28,5 +29,20 @@ class InMemoryOrbitModuleRepositoryTest {
 
         assertEquals(OrbitRoadmap.modules, repository.observeModules().first())
         assertEquals(OrbitRoadmap.modules.size, repository.observeModules().first().size)
+    }
+
+    /**
+     * The snapshot is taken once at construction. Re-collecting must yield the same list
+     * instance, not a copy: an unstable list identity is what breaks Compose skipping in
+     * the dashboard.
+     */
+    @Test
+    fun observeModules_reusesTheSameSnapshotAcrossCollections() = runTest {
+        val repository = InMemoryOrbitModuleRepository()
+
+        val first = repository.observeModules().first()
+        val second = repository.observeModules().first()
+
+        assertSame(first, second)
     }
 }

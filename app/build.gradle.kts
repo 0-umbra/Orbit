@@ -63,6 +63,16 @@ android {
     }
 }
 
+/**
+ * Compose compiler reports: `-classes.txt` lists the inferred stability of every class and
+ * `-composables.txt` lists whether each composable is restartable/skippable. CI asserts the
+ * dashboard types stay stable and skippable, which is what keeps scrolling allocation-free.
+ */
+composeCompiler {
+    reportsDestination.set(layout.buildDirectory.dir("compose_reports"))
+    metricsDestination.set(layout.buildDirectory.dir("compose_metrics"))
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

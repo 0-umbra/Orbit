@@ -87,6 +87,20 @@ The HTML report is written to `app/build/reports/tests/testDebugUnitTest/index.h
 CI runs the same task and uploads the report and the debug APK for every pull request
 targeting `develop`.
 
+## Performance
+
+Scrolling is treated as a first-class requirement:
+
+- the dashboard is a single `LazyColumn` with stable keys and content types;
+- state is `@Immutable` and repositories reuse their snapshots, so rows are skippable;
+- composition does no work (no formatting, upper-casing or allocation per row), and the
+  brand mark is drawn from a cached geometry;
+- flat surfaces only — no shadows, blurs, gradients or animated effects;
+- CI asserts the Compose compiler's stability/skippability report and fails on regressions.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#performance) for the rules and
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#5a-performance-verification) for how to verify them.
+
 ## Git branching policy
 
 - `main` — stable, user-visible releases. Never commit to it directly.

@@ -26,8 +26,16 @@ import com.orbit.commandcenter.ui.components.OrbitInfoCard
 import com.orbit.commandcenter.ui.components.OrbitMark
 import com.orbit.commandcenter.ui.theme.OrbitTheme
 
+// Hoisted so that scrolling this screen does not allocate padding objects per frame.
+private val BackButtonPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+private val VersionNotePadding = Modifier.padding(top = 4.dp)
+
 /**
  * Static "about" screen: explains what ORBIT is and what this build does not do yet.
+ *
+ * The content is a short, fixed set of cards, so it stays a plain scrolling [Column]:
+ * every child is composed once and cached by the layout, which is cheaper than setting up
+ * lazy-list machinery for five items.
  */
 @Composable
 fun AboutScreen(
@@ -48,7 +56,7 @@ fun AboutScreen(
         ) {
             TextButton(
                 onClick = onNavigateBack,
-                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                contentPadding = BackButtonPadding,
             ) {
                 Text(
                     text = stringResource(R.string.about_back),
@@ -90,7 +98,7 @@ fun AboutScreen(
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = VersionNotePadding,
             )
         }
     }

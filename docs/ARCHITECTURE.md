@@ -138,10 +138,73 @@ across short configuration changes and stops work when the screen goes away.
 
 ## Threading
 
-- Repositories expose cold `Flow`s; collection happens in `viewModelScope` (main-safe).
-- Blocking work, when it arrives (database, files), must be moved with an injected
-  dispatcher rather than hard-coding `Dispatchers.IO` in the repository.
+- Repositories expose cold `Flow`s; the ViewModel maps them with `flowOn(backgroundDispatcher)`,
+  where the dispatcher comes from `AppContainer`. The main thread only ever receives a
+  finished snapshot.
+- The dispatcher is injected rather than hard-coded, so tests substitute a deterministic
+  test dispatcher and the Phase 1 database work inherits the same seam.
 - Compose reads state on the main thread only; no synchronous I/O in composables.
+- `Dispatchers.Default` is used because the current work is CPU-bound projection; database
+  access added later should use `Dispatchers.IO` (or Room's own dispatcher).
+
+## Performance
+
+Scrolling is the interaction users feel most, and ORBIT targets entry-level hardware, so
+the rules below are part of the architecture rather than an afterthought.
+
+**Lists**
+
+- Every dynamic collection is a `Lazy*` list. The dashboard is one `LazyColumn`; there are
+  no nested scrollables.
+- Items carry stable `key`s (the domain id, or a constant for the static rows) so items keep
+  their identity and state across recomposition and reordering.
+- Items carry `contentType`s so the lazy layout can reuse slot content for the uniform
+  module cards.
+- The only non-lazy scroller is the About screen: five short, static cards composed once are
+  cheaper than lazy-list bookkeeping.
+
+**Stability**
+
+- `DashboardUiState` is `@Immutable`. Its `List<OrbitModule>` would otherwise make the whole
+  state unstable (any `List` implementation could be mutable), which would prevent the
+  dashboard composables from being skipped.
+- `OrbitModule` is inferred stable by the compiler (a data class of `String`, enum and
+  `Int`-like values); the domain layer therefore stays free of Compose annotations.
+- Repositories hand out one immutable snapshot and reuse it: `InMemoryOrbitModuleRepository`
+  copies once at construction and returns the same instance on every collection, so state
+  objects stay identical and Compose can skip work. Unit tests pin this down.
+- `derivedStateOf` is deliberately not used: no UI value is derived from frequently changing
+  state (scroll position, text input). Adding it here would be ceremony, not optimisation.
+
+**Composition hygiene**
+
+- Composables only read state and build the tree; no parsing, sorting, formatting or
+  upper-casing happens during composition.
+- `StatusPill` remembers its upper-cased label and its alpha-modified colours/border per
+  input instead of recomputing them for every card that scrolls into view.
+- `BorderStroke` instances are hoisted through `rememberOrbitCardBorder()`.
+- Static `PaddingValues`, `Arrangement` and `Modifier` chains are file-level values, so they
+  are allocated once for the process rather than once per composition.
+- `statusLabel`/`statusAccent` are `@ReadOnlyComposable`, so they add no group or
+  recomposition scope to each row.
+
+**Drawing**
+
+- Surfaces are flat: `tonalElevation = 0.dp`, `shadowElevation = 0.dp`, 1dp hairline borders.
+  There are no shadows, blurs, gradients or animated effects on scrolling content.
+- The brand mark uses `drawWithCache`: the ring `Path`, the `Stroke` and the satellite
+  geometry are built once per size, so a scroll frame replays three draw commands with no
+  trigonometry and no allocations.
+- Text uses the platform font (no downloadable fonts, no font assets) and the Material 3
+  type scale.
+
+**Regression guards**
+
+- Unit tests assert that the repository and the ViewModel reuse list instances instead of
+  copying them (copying would silently defeat skipping).
+- CI generates the Compose compiler stability/skippability reports and fails if
+  `DashboardUiState`/`OrbitModule` stop being stable or if a dashboard composable stops
+  being skippable. The reports are uploaded as the `compose-compiler-reports` artifact.
 
 ## Accessibility and quality baseline
 
