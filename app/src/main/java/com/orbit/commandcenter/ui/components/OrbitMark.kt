@@ -37,21 +37,24 @@ fun OrbitMark(
             val shortestSide = size.minDimension
             if (shortestSide <= 0f) return@drawWithCache onDrawBehind { }
 
+            // CacheDrawScope exposes size but not the DrawScope.center helper.
+            val markCenter = Offset(x = size.width / 2f, y = size.height / 2f)
+
             val ringRadius = shortestSide * 0.40f
             val ringStroke = Stroke(width = shortestSide * 0.085f)
-            val ringPath = Path().apply { addOval(Rect(center = center, radius = ringRadius)) }
+            val ringPath = Path().apply { addOval(Rect(center = markCenter, radius = ringRadius)) }
 
             val coreRadius = shortestSide * 0.145f
             val satelliteRadius = shortestSide * 0.072f
             val satelliteAngle = -0.73f // radians, upper-right of the ring
             val satelliteCenter = Offset(
-                x = center.x + ringRadius * cos(satelliteAngle),
-                y = center.y + ringRadius * sin(satelliteAngle),
+                x = markCenter.x + ringRadius * cos(satelliteAngle),
+                y = markCenter.y + ringRadius * sin(satelliteAngle),
             )
 
             onDrawBehind {
                 drawPath(path = ringPath, color = ringColor, style = ringStroke)
-                drawCircle(color = coreColor, radius = coreRadius)
+                drawCircle(color = coreColor, radius = coreRadius, center = markCenter)
                 drawCircle(
                     color = satelliteColor,
                     radius = satelliteRadius,
