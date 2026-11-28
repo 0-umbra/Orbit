@@ -96,10 +96,17 @@ Scrolling is treated as a first-class requirement:
 - composition does no work (no formatting, upper-casing or allocation per row), and the
   brand mark is drawn from a cached geometry;
 - flat surfaces only — no shadows, blurs, gradients or animated effects;
-- CI asserts the Compose compiler's stability/skippability report and fails on regressions.
+- navigation uses explicit 180 ms fades instead of the library's 700 ms default;
+- CI asserts the Compose compiler's stability/skippability report, R8 shrinking and a
+  `profileable` benchmark variant, and fails on regressions.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#performance) for the rules and
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#5a-performance-verification) for how to verify them.
+Measuring on a device: use the **benchmark** build type (release-equivalent, minified,
+debug-key signed for local install) and the script in `tools/perf/`:
+`./gradlew assembleBenchmark && tools/perf/measure-scroll.sh`. Debug builds are not
+representative of real performance.
+
+See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for the measurement procedure and the
+findings log, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#performance) for the rules.
 
 ## Git branching policy
 

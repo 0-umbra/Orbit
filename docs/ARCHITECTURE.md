@@ -198,13 +198,30 @@ the rules below are part of the architecture rather than an afterthought.
 - Text uses the platform font (no downloadable fonts, no font assets) and the Material 3
   type scale.
 
+**Build variants**
+
+- `debug` — development only: not minified, `debuggable` (no AOT-compiled code), Compose
+  tooling included. Its frame timings are not representative and must not be used to judge
+  performance.
+- `benchmark` — release-equivalent and installable: R8 + resource shrinking, not
+  debuggable, `profileable` (see `app/src/benchmark/AndroidManifest.xml`), signed with the
+  local debug key. This is the variant to measure.
+- `release` — minified and shrunk; signed with a real key only when releasing.
+
 **Regression guards**
 
 - Unit tests assert that the repository and the ViewModel reuse list instances instead of
   copying them (copying would silently defeat skipping).
 - CI generates the Compose compiler stability/skippability reports and fails if
-  `DashboardUiState`/`OrbitModule` stop being stable or if a dashboard composable stops
+  `DashboardUiState`/`OrbitModule` stop being stable or if any screen/shared component stops
   being skippable. The reports are uploaded as the `compose-compiler-reports` artifact.
+- CI also fails if the minified benchmark APK is not smaller than the debug APK (proof that
+  R8 and resource shrinking are active) or if the benchmark variant loses its `profileable`
+  flag. Both APKs are uploaded for on-device measurement.
+
+Navigation declares explicit 180 ms fades: `navigation-compose` otherwise applies a 700 ms
+full-screen fade in and out on every navigation, which is ~42 frames of dual-screen
+animation at 60 Hz and is a known source of navigation jank on entry-level hardware.
 
 ## Accessibility and quality baseline
 

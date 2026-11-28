@@ -23,17 +23,35 @@ android {
     buildTypes {
         debug {
             // The debug variant intentionally keeps the production application id so that
-            // the built APK can be verified against `com.orbit.commandcenter` and installed
-            // side by side with a future release build on the same device.
+            // the built APK can be verified against `com.orbit.commandcenter`.
+            // Debug builds are NOT representative of real performance: they are not
+            // minified, they run as `debuggable` (no AOT-compiled code, JIT only) and they
+            // include Compose tooling. Measure with the `benchmark` build type instead.
             isMinifyEnabled = false
         }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // R8 + resource shrinking. This is what makes a release build fast enough to be
+            // worth comparing against debug on entry-level hardware.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+        /**
+         * Release-equivalent build used to measure real performance on a physical device:
+         * minified and shrunk like `release`, not debuggable, `profileable` (see
+         * app/src/benchmark/AndroidManifest.xml) and signed with the local debug key so that
+         * `./gradlew installBenchmark` works without any signing setup.
+         *
+         * This variant is for measurement only — it is not a publishable artefact.
+         */
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            versionNameSuffix = "-benchmark"
         }
     }
 
