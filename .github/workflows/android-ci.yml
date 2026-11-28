@@ -1,0 +1,283 @@
+name: Android CI
+
+# Runs for every pull request that targets develop, and for pushes to feature branches
+# so that work in progress is verified before a pull request is opened.
+on:
+  pull_request:
+    branches:
+      - develop
+  push:
+    branches:
+      - 'feature/**'
+  workflow_dispatch:
+
+# Least privilege: the workflow only reads the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Unit tests, debug and benchmark APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle with caching
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Run unit tests
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain testDebugUnitTest > gradle-test.log 2>&1
+          status=$?
+          tail -n 40 gradle-test.log
+          if [ "$status" -ne 0 ]; then
+            summary=$(grep -E "^e: |error:|Unresolved|FAILED|Caused by:" gradle-test.log | head -8 | tr '\n' '|')
+            echo "::error::testDebugUnitTest failed: ${summary:0:1200}"
+          fi
+          exit "$status"
+
+      - name: Build debug APK
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain assembleDebug > gradle-assemble.log 2>&1
+          status=$?
+          tail -n 40 gradle-assemble.log
+          if [ "$status" -ne 0 ]; then
+            summary=$(grep -E "^e: |error:|Unresolved|FAILED|Caused by:" gradle-assemble.log | head -8 | tr '\n' '|')
+            echo "::error::assembleDebug failed: ${summary:0:1200}"
+          fi
+          exit "$status"
+
+      # Release-equivalent build used for on-device performance measurement: minified,
+      # non-debuggable, profileable and signed with the local debug key so it can be installed.
+      - name: Build minified benchmark APK
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain assembleBenchmark > gradle-benchmark.log 2>&1
+          status=$?
+          tail -n 40 gradle-benchmark.log
+          if [ "$status" -ne 0 ]; then
+            summary=$(grep -E "^e: |error:|Unresolved|FAILED|Caused by:|Missing class|R8" gradle-benchmark.log \
+              | head -8 | tr '\n' '|')
+            echo "::error::assembleBenchmark failed: ${summary:0:1200}"
+          fi
+          exit "$status"
+
+      - name: Compare build variants and inspect benchmark APK
+        run: |
+          DEBUG_APK=app/build/outputs/apk/debug/app-debug.apk
+          PERF_APK=app/build/outputs/apk/benchmark/app-benchmark.apk
+          for apk in "$DEBUG_APK" "$PERF_APK"; do
+            test -f "$apk" || { echo "::error::missing $apk"; exit 1; }
+          done
+          DEBUG_SIZE=$(stat -c %s "$DEBUG_APK")
+          PERF_SIZE=$(stat -c %s "$PERF_APK")
+          ls -lh app/build/outputs/apk/debug/ app/build/outputs/apk/benchmark/
+          echo "::notice::APK size: debug ${DEBUG_SIZE} bytes, minified benchmark ${PERF_SIZE} bytes"
+          if [ "$PERF_SIZE" -ge "$DEBUG_SIZE" ]; then
+            echo "::error::the benchmark APK is not smaller than the debug APK - R8 shrinking is not applied"
+            exit 1
+          fi
+          if unzip -l "$PERF_APK" | grep -q "dexopt/baseline.prof"; then
+            echo "::notice::library baseline profiles are merged into the benchmark APK"
+          else
+            echo "::warning::no baseline profile in the benchmark APK (library profiles were not merged)"
+          fi
+
+      - name: Verify Compose stability report
+        run: |
+          CLASSES=$(ls app/build/compose_reports/*-classes.txt 2>/dev/null | head -1)
+          COMPOSABLES=$(ls app/build/compose_reports/*-composables.txt 2>/dev/null | head -1)
+          if [ -z "$CLASSES" ] || [ -z "$COMPOSABLES" ]; then
+            echo "::error::Compose compiler reports were not generated in app/build/compose_reports"
+            exit 1
+          fi
+          echo "class stability report: $CLASSES"
+          grep -E "class (DashboardUiState|OrbitModule|ModuleStatus)" "$CLASSES" || true
+          echo "composable report: $COMPOSABLES"
+          grep -E "fun (DashboardScreen|DashboardContent|WelcomeCard|OrbitModuleCard|AboutScreen|StatusPill|OrbitBrandHeader|OrbitInfoCard|OrbitMark)\(" "$COMPOSABLES" || true
+          failed=0
+          for type in DashboardUiState OrbitModule; do
+            if grep -qE "^stable class ${type}( |\{|$)" "$CLASSES"; then
+              echo "::notice::${type} is stable"
+            else
+              echo "::error::${type} is not stable: $(grep -E "class ${type}" "$CLASSES" | head -1)"
+              failed=1
+            fi
+          done
+          # App-wide skippability gate: every screen and shared component must be skippable.
+          for fn in DashboardScreen DashboardContent WelcomeCard OrbitModuleCard AboutScreen StatusPill OrbitBrandHeader OrbitInfoCard OrbitMark; do
+            line=$(grep -E "fun ${fn}\(" "$COMPOSABLES" | head -1)
+            if echo "$line" | grep -q "skippable"; then
+              echo "::notice::${fn} is skippable"
+            else
+              echo "::error::${fn} is not skippable: ${line:-not found}"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+
+      - name: Upload Compose compiler reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-compiler-reports
+          path: |
+            app/build/compose_reports
+            app/build/compose_metrics
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Verify application id and SDK levels
+        run: |
+          AAPT2=$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name aapt2 | sort -V | tail -1)
+          echo "Using $AAPT2"
+          failed=0
+          for APK in app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/benchmark/app-benchmark.apk; do
+            echo "== $APK =="
+            if [ ! -f "$APK" ]; then
+              echo "::error::missing $APK"
+              exit 1
+            fi
+            BADGING=$(mktemp)
+            "$AAPT2" dump badging "$APK" > "$BADGING"
+            # Print the identity lines so the log is self-explanatory.
+            grep -E "^(package|minSdkVersion|sdkVersion|targetSdkVersion):" "$BADGING" || true
+            if ! grep -q "package: name='com.orbit.commandcenter'" "$BADGING"; then
+              echo "::error::$APK has an unexpected application id"
+              failed=1
+            fi
+            # aapt/aapt2 builds differ in how they label the minimum SDK line.
+            if ! grep -Eq "(minSdkVersion|sdkVersion):'26'" "$BADGING"; then
+              echo "::error::$APK has an unexpected minSdk"
+              failed=1
+            fi
+            if ! grep -q "targetSdkVersion:'35'" "$BADGING"; then
+              echo "::error::$APK has an unexpected targetSdk"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+
+      - name: Verify merged manifests request no permissions
+        run: |
+          MANIFESTS=$(find app/build/intermediates -path "*merged_manifest*" -type f -name AndroidManifest.xml)
+          if [ -z "$MANIFESTS" ]; then
+            MANIFESTS=$(find app/build/intermediates -type f -name AndroidManifest.xml | head -1)
+          fi
+          if [ -z "$MANIFESTS" ]; then
+            echo "::error::no processed manifest found"
+            exit 1
+          fi
+          failed=0
+          for MERGED in $MANIFESTS; do
+            echo "== $MERGED =="
+            grep -nE 'package=|uses-sdk|uses-permission|profileable' "$MERGED" || true
+            if ! grep -q 'package="com.orbit.commandcenter"' "$MERGED"; then
+              echo "::error::merged manifest has an unexpected package: $MERGED"
+              failed=1
+            fi
+            PERMISSIONS=$(grep -oE '<uses-permission[^>]*name="[^"]+"' "$MERGED" \
+              | sed -E 's/.*name="([^"]+)"/\1/' | sort -u || true)
+            echo "requested permissions: $(echo "${PERMISSIONS:-none}" | tr '\n' ' ')"
+            SYSTEM_PERMISSIONS=$(echo "$PERMISSIONS" | grep -E '^android\.permission\.' || true)
+            if [ -n "$SYSTEM_PERMISSIONS" ]; then
+              echo "::error::Phase 0 must not request Android system permissions: $SYSTEM_PERMISSIONS"
+              failed=1
+            fi
+            # androidx.core generates this app-private signature permission to guard
+            # dynamically registered receivers; it is not a user-visible permission.
+            OTHER_PERMISSIONS=$(echo "$PERMISSIONS" \
+              | grep -v '^com\.orbit\.commandcenter\.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION$' \
+              | grep -v '^$' || true)
+            if [ -n "$OTHER_PERMISSIONS" ]; then
+              echo "::error::unexpected permissions: $OTHER_PERMISSIONS"
+              failed=1
+            fi
+            if echo "$MERGED" | grep -q "/benchmark/"; then
+              if grep -q "<profileable" "$MERGED"; then
+                echo "::notice::benchmark variant is profileable"
+              else
+                echo "::error::benchmark variant is not profileable - perf traces cannot be captured"
+                failed=1
+              fi
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+
+      - name: Summarize unit test results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+
+          total = failures = errors = skipped = 0
+          for path in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
+              suite = ET.parse(path).getroot()
+              print(f"  {suite.get('name')}: {suite.get('tests')} tests")
+              total += int(suite.get("tests", 0))
+              failures += int(suite.get("failures", 0))
+              errors += int(suite.get("errors", 0))
+              skipped += int(suite.get("skipped", 0))
+
+          summary = f"unit tests: {total} run, {failures} failed, {errors} errored, {skipped} skipped"
+          print(summary)
+          # Surfaced as a check-run annotation so results are visible without opening logs.
+          print(f"::notice::{summary}")
+          if total == 0 or failures or errors:
+              print("::error::unit test verification failed")
+              sys.exit("unit test verification failed")
+          PY
+
+      - name: Upload Gradle logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-logs
+          path: gradle-*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload benchmark APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-benchmark-apk
+          path: app/build/outputs/apk/benchmark/app-benchmark.apk
+          if-no-files-found: error
+          retention-days: 14

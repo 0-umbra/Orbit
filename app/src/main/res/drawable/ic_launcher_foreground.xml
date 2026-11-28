@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ORBIT launcher icon foreground: an original mark drawn as a vector so it stays
+    crisp at every density and needs no binary assets.
+    Mark: a violet orbit ring, a blue core, and a small satellite on the ring.
+    The 108x108 canvas keeps all artwork inside the 66dp adaptive-icon safe zone.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Orbit ring -->
+    <path
+        android:pathData="M54,29 a25,25 0 1,0 0.01,0"
+        android:strokeColor="#A99AE8"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Core -->
+    <path
+        android:pathData="M54,46 a8,8 0 1,0 0.01,0"
+        android:fillColor="#83A6C9" />
+
+    <!-- Satellite riding the ring -->
+    <path
+        android:pathData="M72.6,35.4 m-4.6,0 a4.6,4.6 0 1,0 9.2,0 a4.6,4.6 0 1,0 -9.2,0"
+        android:fillColor="#F0F0F2" />
+</vector>

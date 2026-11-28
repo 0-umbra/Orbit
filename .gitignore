@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+
+# Android build outputs
+app/build/
+*.apk
+*.ap_
+*.aab
+*.dex
+captures/
+.cxx/
+
+# Local SDK / machine configuration
+local.properties
+*.hprof
+user.properties
+
+# IDE / editor
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.DS_Store
+
+# Kotlin
+.kotlin/
+
+# Signing material — never commit keystores or credentials
+*.jks
+*.keystore
+keystore.properties
