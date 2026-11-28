@@ -42,10 +42,37 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon --console=plain testDebugUnitTest
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain testDebugUnitTest > gradle-test.log 2>&1
+          status=$?
+          tail -n 40 gradle-test.log
+          if [ "$status" -ne 0 ]; then
+            summary=$(grep -E "^e: |error:|Unresolved|FAILED|Caused by:" gradle-test.log | head -8 | tr '\n' '|')
+            echo "::error::testDebugUnitTest failed: ${summary:0:1200}"
+          fi
+          exit "$status"
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon --console=plain assembleDebug
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain assembleDebug > gradle-assemble.log 2>&1
+          status=$?
+          tail -n 40 gradle-assemble.log
+          if [ "$status" -ne 0 ]; then
+            summary=$(grep -E "^e: |error:|Unresolved|FAILED|Caused by:" gradle-assemble.log | head -8 | tr '\n' '|')
+            echo "::error::assembleDebug failed: ${summary:0:1200}"
+          fi
+          exit "$status"
+
+      - name: Upload Gradle logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-logs
+          path: gradle-*.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Verify Compose stability report
         run: |
